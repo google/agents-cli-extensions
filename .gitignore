@@ -136,6 +136,8 @@ celerybeat.pid
 
 # Environments
 .env
+# Template .env files are rendered into scaffolded projects, not real secrets.
+!core/*/template/.env
 .envrc
 .venv
 env/

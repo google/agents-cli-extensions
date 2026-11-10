@@ -1,10 +1,30 @@
-# Agents CLI Extensions
+<div align="center">
+  <img src="https://raw.githubusercontent.com/google/agents-cli/main/docs/src/assets/logo_sm.png" alt="agents-cli logo" width="120" />
+  <h1>Agents CLI Extensions</h1>
+  <p>The central home for extensions for <a href="https://github.com/google/agents-cli"><code>agents-cli</code></a>.</p>
 
-The central home for extensions for [Agents CLI](https://github.com/google/agents-cli) (`agents-cli`). An extension overrides or adds `agents-cli` commands, so the agent development lifecycle (scaffold, run, evaluate, deploy) works with something the CLI does not ship with, such as another agent framework.
+  <p>
+    <a href="#available-extensions">Extensions</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+    <a href="#installing-an-extension">Install</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+    <a href="#managing-extensions">Manage</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+    <a href="#development">Development</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+    <a href="https://github.com/google/agents-cli-extensions/issues">Issues</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+    <a href="https://github.com/google/agents-cli-extensions">Star us</a>
+  </p>
+</div>
+
+---
+
+An extension overrides or adds `agents-cli` commands, so the agent development lifecycle (scaffold, run, evaluate, deploy) works with something the CLI does not ship with, such as another agent framework.
 
 ## Available extensions
 
-No extensions have been published yet.
+| Extension | Description |
+|---|---|
+| [claude](core/claude) | Claude Agent SDK agents on Claude on Gemini platform, served over A2A. Experimental. |
+| [langchain](core/langchain) | LangChain agents, LangGraph graphs and Deep Agents, served over A2A. Experimental. |
+
+See [RELEASE_NOTES.md](RELEASE_NOTES.md) for what changed in each release.
 
 ## Prerequisites
 
@@ -57,6 +77,7 @@ The Agents CLI docs cover [using](https://google.github.io/agents-cli/guide/exte
 ```
 core/<name>/
 ├── README.md        # what the extension does and how to use it
+├── tests/           # tests for the extension's scripts and overrides
 └── template/        # the project template users scaffold from
     ├── agents-cli-extension.yaml      # command overrides, scaffolded into every project
     └── .template/templateconfig.yaml  # read by the CLI, never copied
