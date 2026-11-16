@@ -136,7 +136,7 @@ celerybeat.pid
 
 # Environments
 .env
-# Template .env files are rendered into scaffolded projects, not real secrets.
+# Template .env files are rendered into each generated project.
 !core/*/template/.env
 .envrc
 .venv
@@ -207,6 +207,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
 
 # Local dev server state (google-agents-cli run)
 .google-agents-cli/

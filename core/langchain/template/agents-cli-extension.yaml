@@ -20,6 +20,9 @@ schema: agents-cli-extension/v1alpha1
 name: langchain
 description: Run LangChain agents, LangGraph graphs, and Deep Agents through the agents-cli lifecycle.
 
+requires:
+  agents_cli: ">=1.14,<2"
+
 commands:
   override:
     playground:

@@ -1,6 +1,6 @@
 # Contributing to agents-cli-extensions
 
-We welcome contributions! If you'd like to report a bug, suggest a feature, or propose a new extension, please [open an issue](https://github.com/google/agents-cli-extensions/issues) on GitHub. Pull requests are not currently accepted.
+We welcome contributions! If you'd like to report a bug, suggest a feature, or propose a new extension, please open an issue in this repository. Pull requests are not currently accepted.
 
 When opening an issue, include:
 - Which extension it concerns, if any
@@ -8,6 +8,10 @@ When opening an issue, include:
 - Steps to reproduce (for bugs)
 - Expected vs actual behavior
 - Relevant logs or error messages, and the output of `agents-cli info`
+
+## Development
+
+See [Development](README.md#development) in the README for the make targets that CI runs.
 
 ## Contributor License Agreement
 

@@ -25,7 +25,7 @@ import uuid
 
 from locust import HttpUser, between, task
 
-ENDPOINT = "/a2a/app/"
+ENDPOINT = "/a2a/app"
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"

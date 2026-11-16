@@ -23,11 +23,7 @@ from pathlib import Path
 
 import pytest
 
-_EXTENSION_DIR = next(
-    p / "core" / "langchain" / "template"
-    for p in Path(__file__).resolve().parents
-    if (p / "core" / "langchain" / "template").is_dir()
-)
+_EXTENSION_DIR = Path(__file__).resolve().parents[1] / "template"
 _SCRIPT_PATH = _EXTENSION_DIR / "scripts/run.py"
 
 # The script imports a sibling module the way python does when run as a file.

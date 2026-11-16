@@ -22,11 +22,7 @@ from pathlib import Path
 
 import pytest
 
-_SCRIPT = next(
-    p / "core" / "claude" / "template" / "scripts" / "publish.py"
-    for p in Path(__file__).resolve().parents
-    if (p / "core" / "claude").is_dir()
-)
+_SCRIPT = Path(__file__).resolve().parents[1] / "template" / "scripts" / "publish.py"
 
 
 def _load():

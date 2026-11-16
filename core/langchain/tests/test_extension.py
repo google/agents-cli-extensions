@@ -25,15 +25,11 @@ from pathlib import Path
 
 import pytest
 import yaml
-
 from google.agents.cli.extension._spec import parse_extension_spec
 
-_REPO_ROOT = next(
-    p
-    for p in Path(__file__).resolve().parents
-    if (p / "core" / "langchain" / "template").is_dir()
-)
-_TEMPLATE_DIR = _REPO_ROOT / "core" / "langchain" / "template"
+_EXTENSION_DIR = Path(__file__).resolve().parents[1]
+_REPO_ROOT = _EXTENSION_DIR.parents[1]
+_TEMPLATE_DIR = _EXTENSION_DIR / "template"
 
 
 def _spec():
@@ -102,7 +98,6 @@ class TestManifestMatchesPublishedSchema:
     def test_first_party_manifest_validates(self):
         """The shipped example must satisfy the document we tell authors to use."""
         import jsonschema
-
         from google.agents.cli.extension._schema import build_json_schema
 
         data = yaml.safe_load(
@@ -115,7 +110,6 @@ class TestManifestMatchesPublishedSchema:
 def project(tmp_path_factory):
     """One scaffold from the template, shared by the checks below."""
     from click.testing import CliRunner
-
     from google.agents.cli.scaffold.commands.create import create
 
     out = tmp_path_factory.mktemp("scaffold")

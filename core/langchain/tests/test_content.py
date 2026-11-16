@@ -25,11 +25,7 @@ from pathlib import Path
 
 import pytest
 
-_EXTENSION_DIR = next(
-    p / "core" / "langchain" / "template"
-    for p in Path(__file__).resolve().parents
-    if (p / "core" / "langchain" / "template").is_dir()
-)
+_EXTENSION_DIR = Path(__file__).resolve().parents[1] / "template"
 _CONTENT_PATH = _EXTENSION_DIR / "app/app_utils/content.py"
 
 

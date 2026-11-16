@@ -19,15 +19,8 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-_REPO_ROOT = next(
-    p
-    for p in Path(__file__).resolve().parents
-    if (p / "core" / "claude" / "template").is_dir()
-)
 _AGENT_EVENTS = (
-    _REPO_ROOT
-    / "core"
-    / "claude"
+    Path(__file__).resolve().parents[1]
     / "template"
     / "app"
     / "app_utils"

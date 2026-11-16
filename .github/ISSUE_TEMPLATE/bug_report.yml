@@ -22,7 +22,7 @@ body:
         > [!IMPORTANT]
         > Thanks for taking the time to fill out this bug report!
         >
-        > Please search **[existing issues](https://github.com/google/agents-cli-extensions/issues)** first. Bugs in `agents-cli` itself belong in the [Agents CLI repository](https://github.com/google/agents-cli/issues).
+        > Please search the existing issues in this repository first. Bugs in `agents-cli` itself belong in the Agents CLI repository.
 
   - type: 'input'
     id: 'extension'

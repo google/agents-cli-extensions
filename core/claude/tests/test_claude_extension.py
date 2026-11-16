@@ -27,15 +27,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
-
 from google.agents.cli.extension._spec import parse_extension_spec
+from google.agents.cli.scaffold.utils.version import get_current_version
+from packaging.version import Version
 
-_REPO_ROOT = next(
-    p
-    for p in Path(__file__).resolve().parents
-    if (p / "core" / "claude" / "template").is_dir()
-)
-_TEMPLATE_DIR = _REPO_ROOT / "core" / "claude" / "template"
+_EXTENSION_DIR = Path(__file__).resolve().parents[1]
+_REPO_ROOT = _EXTENSION_DIR.parents[1]
+_TEMPLATE_DIR = _EXTENSION_DIR / "template"
 
 
 def _spec():
@@ -104,7 +102,6 @@ class TestManifestMatchesPublishedSchema:
     def test_first_party_manifest_validates(self):
         """The shipped example must satisfy the document we tell authors to use."""
         import jsonschema
-
         from google.agents.cli.extension._schema import build_json_schema
 
         data = yaml.safe_load(
@@ -113,14 +110,11 @@ class TestManifestMatchesPublishedSchema:
         jsonschema.validate(data, build_json_schema())
 
 
-@pytest.fixture(scope="module")
-def project(tmp_path_factory):
-    """One scaffold from the template, shared by the checks below."""
+def _scaffold(out: Path, *flags: str) -> Path:
+    """A project made from the template, with `flags` added to `create`."""
     from click.testing import CliRunner
-
     from google.agents.cli.scaffold.commands.create import create
 
-    out = tmp_path_factory.mktemp("scaffold")
     result = CliRunner().invoke(
         create,
         [
@@ -136,10 +130,17 @@ def project(tmp_path_factory):
             "github_actions",
             "--output-dir",
             str(out),
+            *flags,
         ],
     )
     assert result.exit_code == 0, result.output
     return out / "claude-probe"
+
+
+@pytest.fixture(scope="module")
+def project(tmp_path_factory):
+    """One scaffold from the template, shared by the checks below."""
+    return _scaffold(tmp_path_factory.mktemp("scaffold"))
 
 
 class TestScaffoldedProject:
@@ -175,6 +176,13 @@ class TestScaffoldedProject:
         settings = (project / "app/app_utils/settings.py").read_text()
         assert 'AGENT_NAME: str = "claude_probe"' in settings
 
+    def test_memory_bank_is_off(self, project):
+        assert "MEMORY_BANK_ENABLED" not in (project / ".env").read_text()
+
+    def test_it_records_the_cli_version_for_the_traffic_tag(self, project):
+        settings = (project / "app/app_utils/settings.py").read_text()
+        assert f'AGENTS_CLI_VERSION: str = "{get_current_version()}"' in settings
+
     def test_it_names_the_package_after_the_project(self, project):
         """The lock must name the package too, or `uv sync --locked` fails."""
         pyproject = tomllib.loads((project / "pyproject.toml").read_text())
@@ -184,13 +192,22 @@ class TestScaffoldedProject:
         assert [p["name"] for p in root] == ["claude-probe"]
 
 
+@pytest.mark.skipif(
+    Version(get_current_version()) < Version("1.14.0"),
+    reason="create gained --memory-bank in agents-cli 1.14.0",
+)
+def test_memory_bank_flag_turns_memory_on(tmp_path):
+    project = _scaffold(tmp_path, "--memory-bank")
+
+    assert "\nMEMORY_BANK_ENABLED=true\n" in (project / ".env").read_text()
+
+
 @patch("google.agents.cli._runner.subprocess.run")
 def test_enhance_renders_the_agent_name_into_a_project_without_it(
     mock_run, tmp_path, monkeypatch
 ):
     """enhance moves the user's agent.py aside and renders the settings."""
     from click.testing import CliRunner
-
     from google.agents.cli.scaffold.commands.enhance import enhance
 
     mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")

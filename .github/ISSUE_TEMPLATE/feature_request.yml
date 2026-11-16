@@ -22,7 +22,7 @@ body:
         > [!IMPORTANT]
         > Thanks for taking the time to suggest an enhancement!
         >
-        > Please search **[existing issues](https://github.com/google/agents-cli-extensions/issues)** to see if a similar request already exists.
+        > Please search the existing issues in this repository to see if a similar request already exists.
 
   - type: 'input'
     id: 'extension'

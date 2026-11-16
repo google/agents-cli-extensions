@@ -29,7 +29,7 @@ Wrap them in a `StateGraph` node if you need to bring one along.
 when you can:
 
 ```bash
-agents-cli create my-lc-agent --agent google/agents-cli-extensions/core/langchain/template@v0.1.0 -d cloud_run --cicd-runner github_actions
+agents-cli create my-lc-agent --agent google/agents-cli-extensions/core/langchain/template -d cloud_run --cicd-runner github_actions
 ```
 
 For a project that skipped them, `agents-cli scaffold enhance -d cloud_run
@@ -39,8 +39,8 @@ needs network access, and it does not touch `app/`.
 
 ## Serving (A2A protocol)
 
-The deployed agent is served over the Agent2Agent (A2A) protocol — the same
-A2A contract the rest of the toolchain expects — so it works unchanged:
+The deployed agent is served over the Agent2Agent (A2A) protocol - the same
+A2A contract the rest of the toolchain expects - so it works unchanged:
 
 - Entrypoint: `uvicorn app.fast_api_app:app` (the scaffold Dockerfile CMD).
 - A2A JSON-RPC endpoint: `POST /a2a/app`; Agent Card at
@@ -67,10 +67,10 @@ AGENTS_CLI_DISABLE_OVERRIDES=1 agents-cli run --url https://<service-url> --mode
 
 ## What stays native (do NOT override)
 
-- `deploy` — native `agents-cli deploy`; dispatches to the project's configured deployment target.
-- `eval grade`, `eval compare`, `eval analyze` — framework-agnostic.
+- `deploy` - native `agents-cli deploy`; dispatches to the project's configured deployment target.
+- `eval grade`, `eval compare`, `eval analyze` - framework-agnostic.
 - `infra`.
-- `publish gemini` — overridden only to refuse on Agent Runtime, where
+- `publish gemini` - overridden only to refuse on Agent Runtime, where
   registration invokes the agent through ADK's `:streamQuery`. On cloud_run and gke
   it runs the built-in, which registers over A2A. To register a LangChain agent,
   deploy it to Cloud Run or GKE and publish from there.
@@ -78,7 +78,7 @@ AGENTS_CLI_DISABLE_OVERRIDES=1 agents-cli run --url https://<service-url> --mode
 ## Journey
 
 ```bash
-agents-cli create my-lc-agent --agent google/agents-cli-extensions/core/langchain/template@v0.1.0 -d cloud_run
+agents-cli create my-lc-agent --agent google/agents-cli-extensions/core/langchain/template -d cloud_run
 cd my-lc-agent && agents-cli install
 agents-cli run "hello"                     # in-process graph invocation
 agents-cli eval generate --dataset tests/eval/datasets/basic-dataset.json -o tests/eval/output/
@@ -116,5 +116,5 @@ instrumentor rather than ADK's `invoke_agent`/`call_llm`).
 - The deploy contract depends on `app/fast_api_app.py` exposing `app`; keep that
   import working if you restructure the agent.
 - Swapping in a different framework (Deep Agents, a hand-built graph) only means
-  rewriting `app/agent.py` and adding the dependency — leave `root_agent` and
+  rewriting `app/agent.py` and adding the dependency - leave `root_agent` and
   `app/fast_api_app.py` alone.

@@ -1,33 +1,54 @@
 # LangChain extension
 
-Builds, runs, evaluates and deploys LangChain agents, LangGraph graphs and Deep Agents with `agents-cli`. The agent is a compiled LangGraph graph with `messages` state, exported as `root_agent` from `app/agent.py`, and is served over A2A.
+> **Experimental.** Cloud Run and GKE are the supported deployment targets.
 
-**Experimental.** Use `cloud_run` or `gke`. `agent_runtime` serves the app, but `publish gemini`, the Console playground and Console sessions and traces do not work there.
+Run a [LangChain](https://python.langchain.com) agent, LangGraph graph, or Deep Agent through the `agents-cli` lifecycle: scaffold, run, evaluate, and deploy. The template scaffolds a Gemini ReAct agent served over [A2A](https://a2a-protocol.org), with no ADK dependency. It overrides only the commands that depend on the framework, and the rest, such as `deploy`, `infra`, and `eval grade`, run natively.
 
-## Usage
+| Command | Behavior in a LangChain project |
+|---------|---------------------------------|
+| `playground` | Starts the local LangGraph dev server (`langgraph dev`). |
+| `run` | Invokes the compiled graph in-process. |
+| `eval generate` | Generates eval traces in the standard `EvaluationDataset` shape, so `eval grade` works unchanged. |
+| `publish gemini` | Registers over A2A; refused on Agent Runtime, which needs ADK. |
+| `eval dataset`, `eval optimize` | Refused with an explanation: both need an ADK agent. |
 
-Create a new project from the template:
+## Installation
+
+Install [Agents CLI](https://github.com/google/agents-cli) first, then scaffold a project from the template:
 
 ```bash
-agents-cli create my-lc-agent --agent google/agents-cli-extensions/core/langchain/template@v0.1.0 -d cloud_run
-cd my-lc-agent && agents-cli install
-agents-cli run "hello"
+agents-cli create my-agent --agent google/agents-cli-extensions/core/langchain/template -d cloud_run
+cd my-agent && agents-cli install
 ```
 
-The default agent is a Gemini ReAct agent (`langchain.agents.create_agent`) with a sample `get_weather` tool. To use a hand-built `StateGraph` or `deepagents.create_deep_agent`, rewrite `app/agent.py` and keep the name `root_agent`. Pre-1.0 LangChain (LCEL chains, `AgentExecutor`) is not supported.
+Append `@<tag|branch|sha>` to the template path to pin a version. The project's `agents-cli-extension.yaml` holds the overrides and is loaded automatically, so commit it.
 
-## Command overrides
+Then try it:
 
-The scaffolded `agents-cli-extension.yaml` overrides the commands that assume ADK:
+```bash
+agents-cli run "What's the weather in San Francisco?"
+```
 
-| Command | Behavior |
-|---|---|
-| `playground` | Starts the LangGraph dev server (`langgraph dev`) on port 8080. |
-| `run` | Invokes the graph in process with a single prompt. |
-| `eval generate` | Generates eval traces by invoking the graph in process. |
-| `publish gemini` | Registers the agent over A2A; refused on Agent Runtime, which needs ADK. |
-| `eval dataset`, `eval optimize` | Unsupported; the command says so and exits. |
+`run` and `eval` call Gemini, so they need credentials: `GOOGLE_CLOUD_PROJECT` with Application Default Credentials, or `GOOGLE_API_KEY` / `GEMINI_API_KEY` for AI Studio.
 
-`deploy`, `infra`, `eval grade`, `eval compare` and `eval analyze` run the built-in commands.
+### Add to an existing project
 
-The scaffolded project's `.agents/skills/agents-cli-langchain/` skill and its references cover serving, streaming and deployment in detail.
+To use the overrides in a project you already have, install the extension instead of scaffolding:
+
+```bash
+agents-cli extension add google/agents-cli-extensions#core/langchain/template --ref <tag|branch|sha>
+```
+
+Or install a release from PyPI (see the [root README](../../README.md#installing-from-pypi)):
+
+```bash
+agents-cli extension add 'pypi@agents-cli-extensions==<version>#core/langchain/template'
+```
+
+This installs only the command overrides, not the template's agent code or dependencies. The project must already provide what the overridden commands use:
+
+- `app/agent.py` exposing `root_agent`, a compiled LangGraph graph (used by `run` and `eval generate`).
+- `langgraph.json` pointing at that graph (used by `playground`).
+- `langgraph`, `langchain`, and `langgraph-cli[inmem]` in the project's dependencies.
+
+The extension is installed at project scope: it is recorded in `agents-cli-extensions.yaml` and vendored under `extensions/`, so commit both. `extension add` prompts before installing; pass `--yes` to skip the prompt in automation. See the [root README](../../README.md#managing-extensions) for updating and removing extensions.

@@ -18,6 +18,9 @@ schema: agents-cli-extension/v1alpha1
 name: claude
 description: Run Claude Agent SDK agents through the agents-cli lifecycle.
 
+requires:
+  agents_cli: ">=1.14,<2"
+
 commands:
   override:
     run:
