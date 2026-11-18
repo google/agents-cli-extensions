@@ -8,6 +8,7 @@
     <a href="#installing-an-extension">Install</a> &nbsp;&nbsp;|&nbsp;&nbsp;
     <a href="#managing-extensions">Manage</a> &nbsp;&nbsp;|&nbsp;&nbsp;
     <a href="#development">Development</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+    <a href="https://pypi.org/project/google-agents-cli-extensions/">PyPI</a> &nbsp;&nbsp;|&nbsp;&nbsp;
     <a href="https://github.com/google/agents-cli-extensions/issues">Issues</a> &nbsp;&nbsp;|&nbsp;&nbsp;
     <a href="https://github.com/google/agents-cli-extensions">Star us</a>
   </p>

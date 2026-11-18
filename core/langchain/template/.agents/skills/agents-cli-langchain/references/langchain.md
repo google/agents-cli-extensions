@@ -89,6 +89,33 @@ agents-cli deploy                          # native deploy (by deployment target
 Nothing is installed machine-wide: the overrides ride in the project, so a
 teammate who clones it gets them with no setup step.
 
+## Persistence (Checkpointer & Long-Term Store)
+
+On Cloud Run or GKE, pass `--session-type cloud_sql` to `agents-cli create` or
+`agents-cli scaffold enhance` so `agents-cli infra single-project --apply`
+provisions a Cloud SQL for PostgreSQL instance and wires its credentials into the
+service.
+
+`app/app_utils/services.py` configures both short-term thread state and long-term
+cross-thread memory in `app/fast_api_app.py`'s lifespan and attaches them to
+`root_agent` via `root_agent.copy(update={"checkpointer": ..., "store": ...})`:
+
+| Variable | Effect |
+|---|---|
+| `SESSION_DB_URI` | Direct Postgres connection URI (`postgresql://...`) for `AsyncPostgresSaver` + `AsyncPostgresStore` |
+| `INSTANCE_CONNECTION_NAME` + `DB_PASS` | Cloud SQL Unix socket (`/cloudsql/<instance>`) with optional `DB_USER` and `DB_NAME` (default `postgres`) |
+| *(unset)* | Falls back to in-process `InMemorySaver` + `InMemoryStore` (retained in memory for the container's lifetime; not shared across replicas) |
+
+- **Thread checkpoints**: the A2A executor maps `task.context_id` (falling back to
+  `task.id`) to `config={"configurable": {"thread_id": task.context_id or task.id}}`,
+  so multi-turn A2A conversations resume from the same thread.
+- **Long-term store**: tools and nodes read/write cross-thread items via
+  `from langgraph.prebuilt import InjectedStore` and
+  `from langgraph.store.base import BaseStore`.
+- **Keep `root_agent` un-checkpointed at import time** in `app/agent.py`:
+  `langgraph dev` (`agents-cli playground`) rejects graphs that already carry a
+  custom `checkpointer` or `store` instance at module load.
+
 ## Telemetry
 
 `app/app_utils/telemetry.py` runs at startup from `app/fast_api_app.py` and reads

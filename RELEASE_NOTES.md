@@ -1,5 +1,14 @@
 # Release notes
 
+## [1.15.0] - 2026-11-18
+
+- LangChain: Pass `--session-type cloud_sql` to `agents-cli create` or
+  `scaffold enhance` on Cloud Run or GKE to persist thread checkpoints
+  (`AsyncPostgresSaver`) and cross-thread long-term store items
+  (`AsyncPostgresStore`) in Cloud SQL for PostgreSQL. When database
+  credentials are unset, the agent falls back to `InMemorySaver` and
+  `InMemoryStore`.
+
 ## [1.14.2] - 2026-11-16
 
 - Claude: Pass `--memory-bank` to `agents-cli create` to give the agent

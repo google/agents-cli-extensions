@@ -1,7 +1,7 @@
 # The PyPI package agents-cli installs extensions from, plus the dev tooling for this repo.
 [project]
 name = "google-agents-cli-extensions"
-version = "1.14.2"
+version = "1.15.0"
 requires-python = ">=3.11"
 description = "Extensions for agents-cli, installed with `agents-cli extension add pypi@agents-cli-extensions`."
 readme = "README.md"
@@ -36,7 +36,7 @@ only-include = ["core", "README.md", "LICENSE"]
 [dependency-groups]
 dev = [
     # The contract tests parse manifests and scaffold templates with the CLI itself.
-    "google-agents-cli>=1.14.0,<2",
+    "google-agents-cli>=1.15.0,<2",
     "pytest>=9.0.2",
     "jsonschema>=4.20",
     "pyyaml>=6.0.2",

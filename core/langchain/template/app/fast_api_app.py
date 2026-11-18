@@ -27,14 +27,19 @@ the A2A protocol natively.
 
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.agent import root_agent
 from app.app_utils.a2a import add_a2a_routes
+from app.app_utils.services import persistence_context
 from app.app_utils.telemetry import setup_telemetry
+
+logger = logging.getLogger(__name__)
 
 # Configure tracing + GenAI logging before the app handles any request.
 setup_telemetry()
@@ -42,8 +47,41 @@ setup_telemetry()
 
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI) -> AsyncIterator[None]:
-    add_a2a_routes(app_instance)
-    yield
+    # Open the Cloud SQL pool (if DB env vars are set) or fall back to in-memory
+    # persistence for the lifetime of the server. The compiled graph closes over
+    # its checkpointer and store, so the pool must outlive the request loop.
+    async with persistence_context() as persistence:
+        custom_checkpointer = getattr(root_agent, "checkpointer", None)
+        custom_store = getattr(root_agent, "store", None)
+        if persistence.has_postgres and (
+            custom_checkpointer is not None or custom_store is not None
+        ):
+            kept = ", ".join(
+                name
+                for name, val in (
+                    ("checkpointer", custom_checkpointer),
+                    ("store", custom_store),
+                )
+                if val is not None
+            )
+            logger.warning(
+                "root_agent already defines %s; keeping custom instance(s) instead of Postgres.",
+                kept,
+            )
+        app_instance.state.agent = root_agent.copy(
+            update={
+                "checkpointer": (
+                    custom_checkpointer
+                    if custom_checkpointer is not None
+                    else persistence.checkpointer
+                ),
+                "store": custom_store
+                if custom_store is not None
+                else persistence.store,
+            }
+        )
+        add_a2a_routes(app_instance, agent=app_instance.state.agent)
+        yield
 
 
 app = FastAPI(

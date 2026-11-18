@@ -31,6 +31,8 @@ agents-cli run "What's the weather in San Francisco?"
 
 `run` and `eval` call Gemini, so they need credentials: `GOOGLE_CLOUD_PROJECT` with Application Default Credentials, or `GOOGLE_API_KEY` / `GEMINI_API_KEY` for AI Studio.
 
+By default (`--session-type in_memory`), the server keeps A2A thread checkpoints and store items in an in-process `InMemorySaver` and `InMemoryStore` for the lifetime of each container (retained in memory until restart or scale-down, and not shared across replicas). Pass `--session-type cloud_sql` to `create` or `scaffold enhance` on Cloud Run or GKE to persist both in Cloud SQL for PostgreSQL instead.
+
 ### Add to an existing project
 
 To use the overrides in a project you already have, install the extension instead of scaffolding:
