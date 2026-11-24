@@ -28,7 +28,7 @@ from typing import Any
 import claude_agent_sdk
 from claude_agent_sdk import ClaudeAgentOptions
 
-from app.app_utils import settings, workspaces
+from app.app_utils import agent_platform_sessions, settings, workspaces
 from app.app_utils.project_settings import (
     copy_project_settings,
     settings_allow_rules,
@@ -51,7 +51,11 @@ async def turn_options(
     Starts or resumes the session for `conversation_id`, scoped to `user_id`.
     Defaults apply only where `root_agent` leaves a field unset.
     """
-    session_store = _session_store(options)
+    session_store = _session_store(options, conversation_id)
+    if isinstance(session_store, agent_platform_sessions.TranscriptStore):
+        # As ADK names unauthenticated callers.
+        owner = user_id or f"A2A_USER_{conversation_id}"
+        await agent_platform_sessions.ensure_session(owner, conversation_id)
     session_id = session_id_for(conversation_id)
     cwd = Path(options.cwd) if options.cwd else _workspace_for(session_id, user_id)
     session_fields = await _session_fields(session_store, session_id, cwd)
@@ -115,10 +119,15 @@ def session_id_for(conversation_id: str) -> str:
     return str(uuid.uuid5(_SESSION_NAMESPACE, conversation_id))
 
 
-def _session_store(options: ClaudeAgentOptions) -> Any:
-    """The agent's own store, else the Cloud SQL store when it is configured."""
+def _session_store(options: ClaudeAgentOptions, conversation_id: str) -> Any:
+    """The agent's own store, else the store for `SESSION_TYPE`."""
     if options.session_store is not None:
         return options.session_store
+    backend = agent_platform_sessions.session_type()
+    if backend == "agent_platform_sessions":
+        return agent_platform_sessions.TranscriptStore(conversation_id)
+    if backend == "in_memory":
+        return None
     return _cloud_sql_store()
 
 

@@ -28,7 +28,7 @@ The model runs on Claude on Gemini platform and must be enabled in Model Garden.
 | ADK runner behind `agents-cli run` | `agents-cli run` runs `root_agent` in process |
 | `agents-cli eval dataset synthesize`, `eval optimize` | Unavailable: both drive the agent through ADK. The command says so and exits |
 | `agents-cli eval generate --url` (traces from a served agent) | Unavailable: the server speaks A2A, not ADK's `/run_sse`. `eval generate` runs `root_agent` in process; the command refuses `--url` |
-| ADK sessions | Claude sessions, one per A2A conversation; scaffold with `--session-type cloud_sql` to keep them across instances |
+| ADK sessions | Claude sessions, one per A2A conversation; pick `--session-type` (`agent_platform_sessions`, `cloud_sql`, or `in_memory`, rendered into `app/app_utils/settings.py`). `agent_platform_sessions` needs no extra infra; `cloud_sql` uses Terraform on `cloud_run` or manual PSC-I + connector setup on `agent_runtime` (`references/claude.md`) |
 
 ## The contract
 
@@ -83,8 +83,8 @@ Prefix any command with `AGENTS_CLI_DISABLE_OVERRIDES=1` to reach the built-in i
 
 A2A: JSON-RPC at `POST /a2a/app`, card at `/a2a/app/.well-known/agent-card.json`,
 health at `/health`; over A2A, text streams as it is generated. On Agent Runtime, also
-`:query` and `:streamQuery` (new sessions and turns), which `agents-cli run --mode adk`
-and an ingress Agent Gateway use. See `references/claude.md` for sessions, telemetry
+`:query` and `:streamQuery` (sessions and turns), which `agents-cli run --mode adk`,
+the Console playground and an ingress Agent Gateway use. See `references/claude.md` for sessions, telemetry
 and deployment.
 
 ## Common mistakes

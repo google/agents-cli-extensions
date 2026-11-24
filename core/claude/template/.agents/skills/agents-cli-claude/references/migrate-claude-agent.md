@@ -43,7 +43,7 @@ Read the entrypoint (`main.py`, scripts, notebooks) and fill in this table:
 | Hooks or a `statusLine` the agent needs, in `.claude/settings.json`, that run local commands (`afplay`, `uv run`, a script) | Moved to `agent_config/`, they run in the container: drop the ones the image can't run (step 5). Tell the user |
 | A model, or a subagent's `model:`, that isn't enabled in Model Garden | Ask the user to enable it or name a replacement. Don't pick one yourself |
 | Calls to other agents (HTTP clients, other services' agents) | If they serve A2A, use the `remote_agent` helper in place of the tool that calls them (step 5). Tell the user |
-| Multi-turn conversations | On `cloud_run`, scaffold with `--session-type cloud_sql` to keep them across restarts and instances; on `agent_runtime`, Cloud SQL needs manual setup (step 3) |
+| Multi-turn conversations | Pick `--session-type agent_platform_sessions` or `cloud_sql` (`cloud_run` or `agent_runtime`) to keep them across restarts and instances; `cloud_sql` on `agent_runtime` needs manual network setup |
 | `requires-python` that excludes 3.12 (e.g. `>=3.13`) | The image builds on `python:3.12-slim` and `uv sync` fails there: change it (step 5) |
 
 Check: show the user the filled table and the plan before editing anything.
@@ -62,19 +62,22 @@ agents-cli scaffold enhance google/agents-cli-extensions/core/claude/template \
 Optional: `--name <name>` (default: the directory name), which also names the deployed
 service or agent; `--region <region>` (default `us-east1`; `infra` deploys there, so pass
 the same one to `deploy`); `--bq-analytics` to log each turn to BigQuery Agent
-Analytics; and `--memory-bank` to give the agent memory of each user in Memory Bank.
+Analytics; `--memory-bank` to give the agent memory of each user in Memory Bank; and
+`--agent-gateway` (`agent_runtime` only) to add `AGENT_GATEWAY_ROOT_CERTIFICATES` to
+`Dockerfile` when binding an egress Agent Gateway.
 
-On `agent_runtime`, `publish gemini`, the Console playground and the Console's
-session views do not work, and Cloud SQL sessions need manual network and database setup
-(the project's `.agents/skills/agents-cli-claude/references/claude.md`, Sessions): tell
-the user before choosing it.
+On `agent_runtime`, `publish gemini` does not work: tell the user before choosing it.
+Choose `--session-type agent_platform_sessions` (default; Console playground and session
+views work, and required when using Agent Gateway because `agent_runtime` forbids
+combining a VPC network attachment with a gateway), `cloud_sql` (manual VPC/connector
+setup without Agent Gateway; see `references/claude.md`), or `in_memory`.
 
-Agent Runtime's managed sessions don't apply to Claude agents. Multi-turn works on every target while a conversation's turns reach the same live
-instance, and ends when that instance restarts or a turn lands on another one. On
-`cloud_run`, add `--session-type cloud_sql` when the agent holds multi-turn
-conversations: Terraform then provisions a Cloud SQL Postgres database the transcripts
-are mirrored to, so a conversation survives restarts and moves between instances. Cloud
-SQL costs money while it runs.
+On `cloud_run`, multi-turn works while a conversation's turns reach the same live
+instance, and ends when that instance restarts or a turn lands on another one. Add
+`--session-type agent_platform_sessions` (managed sessions in an Agent Runtime engine)
+or `--session-type cloud_sql` (Terraform provisions a Cloud SQL Postgres database; costs
+money while it runs) when the agent holds multi-turn conversations across restarts and
+instances.
 
 `enhance` writes the template as `create` would: the A2A server, runtime, a sample
 `app/agent.py`, `pyproject.toml`, `Dockerfile`, deployment files, tests and command
@@ -96,6 +99,8 @@ object the existing code builds:
 # app/agent.py
 from claude_agent_sdk import ClaudeAgentOptions, create_sdk_mcp_server, tool
 
+from app.feature_tools import FEATURE_MCP_SERVERS, FEATURE_TOOLS
+
 
 # In a real repo, import the existing tool instead of defining it here.
 @tool("search_products", "Search the catalog.", {"query": str})
@@ -107,12 +112,16 @@ root_agent = ClaudeAgentOptions(
     model="claude-haiku-4-5",
     system_prompt="You help customers find products.",
     mcp_servers={
-        "products": create_sdk_mcp_server(name="products", tools=[search_products])
+        "products": create_sdk_mcp_server(name="products", tools=[search_products]),
+        **FEATURE_MCP_SERVERS,
     },
     tools=[],
-    allowed_tools=["mcp__products__search_products"],
+    allowed_tools=["mcp__products__search_products", *FEATURE_TOOLS],
 )
 ```
+
+- Keep `**FEATURE_MCP_SERVERS` and `*FEATURE_TOOLS` from `app.feature_tools` so optional
+  scaffold features (such as `--memory-bank`'s `search_memory` tool) stay wired in.
 
 - Move the fields from the original `ClaudeAgentOptions(...)` unchanged: `model`,
   `system_prompt`, `tools`, `allowed_tools`, `mcp_servers`, `agents`, `hooks`,
@@ -181,7 +190,7 @@ Apply the rows step 2 found, and the `packages` row when step 4 finds it:
 | Hooks that run local commands | Remove those entries from `agent_config/.claude/settings.json`; keep the rest of the file |
 | `requires-python` excludes 3.12 | Set `FROM python:3.12-slim` in `Dockerfile` to a version it allows, e.g. `python:3.13-slim` |
 | The moved `pyproject.toml` listed packages besides `app` in `[tool.hatch.build.targets.wheel] packages` | Add them to that list in `pyproject.toml`, and `COPY ./<package> ./<package>` for each before `RUN uv sync --frozen` in `Dockerfile`, or the image build can't find them |
-| Subagents | Add `"Agent"` to `tools` (when it is a list) and to `allowed_tools`; older SDKs called it `"Task"`, so replace that |
+| Subagents | Add `"Agent"` to `tools` (when it is a list) and to `allowed_tools`; older SDKs called it `"Task"`, so replace that. Copy `.claude/agents/*.md` into `agent_config/.claude/agents/`. If a subagent names an alias (`model="sonnet"` or `model: sonnet`) that isn't enabled in Model Garden, map it in `root_agent.env` (e.g. `env={"ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-haiku-4-5"}`) after asking the user |
 | Calls to another A2A agent | `remote_agent("<name>", "<url>", description="<the original tool's description>")` from `app/app_utils/remote_agents.py` in `mcp_servers` (the description tells the model when to call it), `mcp__<name>__ask` in `allowed_tools`; the caller needs `roles/run.invoker` on a Cloud Run target, `roles/aiplatform.user` for an Agent Runtime target (URL: its `.../reasoningEngines/<id>/api/a2a/app` passthrough); a caller on Agent Runtime calling a Cloud Run target also passes `bind_id_token=False`; a token goes by default only to Agent Runtime and `*.run.app` URLs, so a Cloud Run target behind a custom domain passes `auth=True` |
 
 Always describe the agent in `_agent_card()` in `app/app_utils/a2a.py`: callers read the
@@ -285,6 +294,14 @@ creates the Agent Runtime agent (named after the project), the dataset and the a
 BigQuery roles, and `deploy` then updates that same agent. Query it with
 `--url https://<region>-aiplatform.googleapis.com/v1/<Agent Runtime ID>`, the resource
 name `deploy` prints.
+
+When binding to an **Agent Gateway** on `agent_runtime`, pass `--agent-gateway-ingress
+<gateway-resource>` and/or `--agent-gateway-egress <gateway-resource>` to `agents-cli
+deploy` (an egress gateway requires `scaffold enhance ... --agent-gateway` first, plus an
+IAP V2 policy and IAM Unified Access Policy allowing the destination Google API hosts).
+If the ingress gateway has a Model Armor Prompt Guard policy, also pass `--framework
+google-adk` on `deploy` and verify via `--mode adk` (`--mode a2a` uses the `/api/a2a/app`
+HTTP passthrough, which bypasses the ingress gateway).
 
 `agents-cli deploy` copies `.env` into the agent's environment. CI/CD deploys have no
 `.env`: add the values the agent needs (e.g. remote agent URLs) to the pipeline's

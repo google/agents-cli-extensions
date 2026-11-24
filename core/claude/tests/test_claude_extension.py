@@ -97,6 +97,28 @@ class TestExtensionSpec:
                 if token.startswith("scripts/"):
                     assert (_TEMPLATE_DIR / token).is_file(), token
 
+    def test_run_override_help_lists_local_and_remote_flags(self):
+        """Click intercepts `--help` on overrides without invoking `scripts/run.py`."""
+        from click.testing import CliRunner
+        from google.agents.cli.extension._overrides import make_override_command
+
+        run_cmd = next(c for c in _spec().commands if c.name == "run")
+        cmd = make_override_command(
+            run_cmd,
+            extension_name="claude",
+            scope="project",
+            leaf_name="run",
+            display_path="run",
+            extension_root=_TEMPLATE_DIR,
+            source=None,
+        )
+
+        result = CliRunner().invoke(cmd, ["--help"])
+
+        assert result.exit_code == 0
+        for token in ("--session-id", "-v", "--url", "--mode", "-h"):
+            assert token in result.output
+
 
 class TestManifestMatchesPublishedSchema:
     def test_first_party_manifest_validates(self):
@@ -179,6 +201,10 @@ class TestScaffoldedProject:
     def test_memory_bank_is_off(self, project):
         assert "MEMORY_BANK_ENABLED" not in (project / ".env").read_text()
 
+    def test_it_records_the_session_type_in_settings(self, project):
+        settings = (project / "app/app_utils/settings.py").read_text()
+        assert 'SESSION_TYPE: str = "in_memory"' in settings
+
     def test_it_records_the_cli_version_for_the_traffic_tag(self, project):
         settings = (project / "app/app_utils/settings.py").read_text()
         assert f'AGENTS_CLI_VERSION: str = "{get_current_version()}"' in settings
@@ -190,6 +216,16 @@ class TestScaffoldedProject:
         lock = tomllib.loads((project / "uv.lock").read_text())
         root = [p for p in lock["package"] if p["source"] == {"editable": "."}]
         assert [p["name"] for p in root] == ["claude-probe"]
+
+
+@pytest.mark.parametrize(
+    "session_type", ["in_memory", "cloud_sql", "agent_platform_sessions"]
+)
+def test_session_type_flag_is_written_to_settings(tmp_path, session_type):
+    project = _scaffold(tmp_path, "--session-type", session_type)
+
+    settings = (project / "app/app_utils/settings.py").read_text()
+    assert f'SESSION_TYPE: str = "{session_type}"' in settings
 
 
 @pytest.mark.skipif(

@@ -23,7 +23,8 @@ import anyio
 import pytest
 from claude_agent_sdk import ClaudeAgentOptions, HookMatcher, InMemorySessionStore
 
-from app.app_utils import claude, settings, turn_options
+from app.app_utils import agent_platform_sessions, claude, settings, turn_options
+from app.app_utils.telemetry.config import agent_name
 from tests.unit.helpers import workspaces_root, write_local_transcript
 
 pytestmark = pytest.mark.usefixtures("isolated")
@@ -392,3 +393,157 @@ class TestTurnOptions:
 
     def test_without_cloud_sql_there_is_no_store(self):
         assert _options_for(ClaudeAgentOptions(), "ctx-1").session_store is None
+
+    def test_on_agent_runtime_the_conversation_resumes_from_its_session(
+        self, sessions_api
+    ):
+        first = _options_for(ClaudeAgentOptions(), "ctx-1", "user-1")
+        store = first.session_store
+        session = turn_options.session_id_for("ctx-1")
+        key = {"project_key": "p", "session_id": session}
+        entries = [{"type": "user", "n": 1}, {"type": "assistant", "n": 2}]
+        anyio.run(store.append, key, entries)
+        anyio.run(store.append, {**key, "subpath": "subagents/agent-a"}, [{"n": 3}])
+        later = _options_for(ClaudeAgentOptions(), "ctx-1", "user-1")
+
+        assert isinstance(store, agent_platform_sessions.TranscriptStore)
+        [api_session] = sessions_api.sessions.values()
+        assert api_session.name.endswith("/sessions/ctx-1")
+        assert api_session.user_id == "user-1"
+        assert (first.session_id, later.resume) == (session, session)
+        assert anyio.run(later.session_store.load, key) == entries
+        assert anyio.run(later.session_store.list_subkeys, key) == ["subagents/agent-a"]
+
+    def test_an_unauthenticated_callers_session_belongs_to_the_conversation(
+        self, sessions_api
+    ):
+        _options_for(ClaudeAgentOptions(), "ctx-1")
+
+        [api_session] = sessions_api.sessions.values()
+        assert api_session.user_id == "A2A_USER_ctx-1"
+
+    def test_another_users_conversation_is_refused(self, sessions_api):
+        _options_for(ClaudeAgentOptions(), "ctx-1", "user-1")
+
+        with pytest.raises(claude.AgentError, match="another user's"):
+            _options_for(ClaudeAgentOptions(), "ctx-1", "user-2")
+
+    def test_session_type_cloud_sql_uses_postgres_even_on_agent_runtime(
+        self, sessions_api, monkeypatch
+    ):
+        from app.app_utils.session_store import PostgresSessionStore
+
+        monkeypatch.setenv("SESSION_TYPE", "cloud_sql")
+        monkeypatch.setenv("INSTANCE_CONNECTION_NAME", "proj:us-east1:db")
+        monkeypatch.setenv("DB_PASS", "secret")
+        with patch.object(
+            PostgresSessionStore, "exists", AsyncMock(return_value=False)
+        ):
+            options = _options_for(ClaudeAgentOptions(), "ctx-1")
+
+        assert isinstance(options.session_store, PostgresSessionStore)
+        assert sessions_api.sessions == {}
+
+    def test_session_type_in_memory_skips_remote_stores(
+        self, sessions_api, monkeypatch
+    ):
+        monkeypatch.setenv("SESSION_TYPE", "in_memory")
+        monkeypatch.setenv("INSTANCE_CONNECTION_NAME", "proj:us-east1:db")
+        monkeypatch.setenv("DB_PASS", "secret")
+
+        options = _options_for(ClaudeAgentOptions(), "ctx-1")
+
+        assert options.session_store is None
+        assert sessions_api.sessions == {}
+
+    def test_settings_session_type_selects_store_and_env_overrides_it(
+        self, sessions_api, monkeypatch
+    ):
+        monkeypatch.delenv("SESSION_TYPE", raising=False)
+        monkeypatch.setattr(settings, "SESSION_TYPE", "agent_platform_sessions")
+        assert isinstance(
+            _options_for(ClaudeAgentOptions(), "ctx-1", "u").session_store,
+            agent_platform_sessions.TranscriptStore,
+        )
+
+        monkeypatch.setenv("SESSION_TYPE", "in_memory")
+        assert _options_for(ClaudeAgentOptions(), "ctx-2", "u").session_store is None
+
+    def test_invalid_session_type_is_refused(self, monkeypatch):
+        monkeypatch.setenv("SESSION_TYPE", "redis")
+
+        with pytest.raises(claude.AgentError, match="Invalid SESSION_TYPE='redis'"):
+            _options_for(ClaudeAgentOptions(), "ctx-1")
+
+    @pytest.mark.parametrize(
+        ("engine_name", "display_name", "exists"),
+        [
+            (None, agent_name(), True),
+            ("shared-sessions", "shared-sessions", False),
+        ],
+        ids=["default-existing", "named-created"],
+    )
+    def test_off_agent_runtime_agent_platform_sessions_uses_named_engine(
+        self, sessions_api, monkeypatch, engine_name, display_name, exists
+    ):
+        from unittest.mock import MagicMock
+
+        monkeypatch.delenv("GOOGLE_CLOUD_AGENT_ENGINE_ID", raising=False)
+        monkeypatch.delenv("GOOGLE_CLOUD_AGENT_ENGINE_LOCATION", raising=False)
+        monkeypatch.setenv("GOOGLE_CLOUD_LOCATION", "us-west1")
+        if engine_name:
+            monkeypatch.setenv("AGENT_ENGINE_SESSION_NAME", engine_name)
+        name = "projects/p/locations/us-west1/reasoningEngines/9"
+        engine = MagicMock(api_resource=MagicMock(name=name))
+        engine.api_resource.name = name
+        client_cls = MagicMock()
+        runtimes = client_cls.return_value.runtimes
+        runtimes.list.return_value = [engine] if exists else []
+        runtimes.create.return_value = engine
+
+        with patch("agentplatform.Client", client_cls):
+            _options_for(ClaudeAgentOptions(), "ctx-1", "user-1")
+            _options_for(ClaudeAgentOptions(), "ctx-2", "user-1")
+
+        client_cls.assert_called_once_with(location="us-west1")
+        runtimes.list.assert_called_once_with(
+            config={"filter": f"display_name={display_name}"}
+        )
+        if exists:
+            runtimes.create.assert_not_called()
+        else:
+            runtimes.create.assert_called_once_with(
+                config={"display_name": display_name}
+            )
+        assert sorted(sessions_api.sessions) == [
+            f"{name}/sessions/ctx-1",
+            f"{name}/sessions/ctx-2",
+        ]
+
+    def test_on_agent_runtime_engine_falls_back_to_adc_project(
+        self, sessions_api, monkeypatch
+    ):
+        monkeypatch.delenv("GOOGLE_CLOUD_PROJECT", raising=False)
+        with patch("google.auth.default", return_value=(None, "adc-proj")):
+            _options_for(ClaudeAgentOptions(), "ctx-1", "user-1")
+
+        assert list(sessions_api.sessions) == [
+            "projects/adc-proj/locations/us-central1/reasoningEngines/123/sessions/ctx-1"
+        ]
+
+    def test_transcript_store_exists_stops_on_first_matching_entry(self, sessions_api):
+        _options_for(ClaudeAgentOptions(), "ctx-1", "user-1")
+        store = agent_platform_sessions.TranscriptStore("ctx-1")
+        key = {"project_key": "p", "session_id": "s"}
+        anyio.run(
+            store.append,
+            key,
+            [{"type": "user", "n": 1}, {"type": "assistant", "n": 2}],
+        )
+        # Corrupt the second entry's JSON so a full load() would fail with JSONDecodeError;
+        # exists() stops at the first matching entry without parsing JSON.
+        [events] = sessions_api.events.values()
+        events[1].event_metadata.custom_metadata["transcript"]["entry"] = "{not-json"
+
+        assert anyio.run(store.exists, key) is True
+        assert anyio.run(store.exists, {**key, "subpath": "subagents/none"}) is False

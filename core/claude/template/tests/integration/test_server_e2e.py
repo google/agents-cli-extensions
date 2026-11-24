@@ -65,6 +65,8 @@ def start_server() -> subprocess.Popen[str]:
     ]
     env = os.environ.copy()
     env["INTEGRATION_TEST"] = "TRUE"
+    # Keep local integration tests self-contained even when .env selects a remote store.
+    env["SESSION_TYPE"] = "in_memory"
     # The agent card advertises this, and the A2A client follows it.
     env["APP_URL"] = BASE_URL
     process = subprocess.Popen(

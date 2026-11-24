@@ -7,10 +7,12 @@ commands that assume ADK. Everything else (deploy, infra, eval grade) runs nativ
 
 The container serves A2A and exports traces as on Cloud Run. It also serves Agent
 Runtime's `:query` and `:streamQuery` methods (see Serving), so `agents-cli run --mode
-adk` works and an ingress Agent Gateway can govern the agent. `publish gemini` is refused,
-the Console playground cannot invoke the agent, and the Console's session and trace views
-stay empty; read traces in Cloud Trace. Transcripts stay on the instance unless you set
-up Cloud SQL by hand (see Sessions).
+adk`, the Console playground and an ingress Agent Gateway work. Choose the session
+backend with `--session-type` (rendered to `SESSION_TYPE` in `app/app_utils/settings.py`,
+overridable by `SESSION_TYPE` in the environment): with `agent_platform_sessions`,
+conversations live in the engine's Agent Platform Sessions and appear in the Console;
+with `cloud_sql` or `in_memory`, see Sessions below. `publish gemini` is refused, and
+the Console's trace view stays empty; read traces in Cloud Trace.
 
 ## How the agent runs
 
@@ -98,32 +100,64 @@ With an authenticated A2A caller, a conversation is scoped to that caller. Witho
 and reads that conversation: treat it as a secret and never derive it from guessable
 values.
 
-Transcripts live on the instance's disk unless a session store is configured, so a
-conversation ends when its instance restarts or a turn lands on another one. A bare
+`SESSION_TYPE` in `app/app_utils/settings.py` (set by `--session-type` at scaffold time,
+and overridable by the `SESSION_TYPE` environment variable) selects the session backend:
+`agent_platform_sessions`, `cloud_sql`, or `in_memory`. Local in-process runs
+(`agents-cli run` and `agents-cli eval generate`) keep transcripts on disk unless
+`SESSION_TYPE` is set in the environment.
+
+With `SESSION_TYPE=agent_platform_sessions`, a conversation is a session in Agent
+Platform Sessions, with the conversation id as its session id and the caller's `user_id`
+(else `A2A_USER_<context_id>`) as its user. On Agent Runtime the agent's own engine
+holds the sessions; elsewhere (such as Cloud Run), an Agent Runtime engine named by
+`AGENT_ENGINE_SESSION_NAME` (default `AGENT_NAME`, in `GOOGLE_CLOUD_LOCATION` or
+`us-east1` when that is `global`) holds them and is created on first use. The session
+keeps the transcript, which turns resume from on any instance, and the user message and
+events of each `:streamQuery` turn, which the Console and `async_get_session` show; A2A
+turns keep only the transcript. Each transcript entry is one API call, so a turn makes a
+dozen calls or more; the API's limits on events apply. Session ids must match
+`[a-z0-9][a-z0-9-]*` (UUIDs from A2A clients do); the API rejects others. The API has no
+lock: send a conversation's turns one at a time. Sessions created in the Console's
+playground belong to its user, `vais-query-reasoning-engine`.
+
+With `SESSION_TYPE=in_memory`, transcripts live on the instance's disk unless `root_agent`
+passes its own `session_store`, so a conversation ends when its instance restarts or a
+turn lands on another one. A bare
 deploy scales to zero (`--min-instances 1` keeps one warm); the Agent Runtime engine
 `infra single-project` creates keeps one instance always on, billed while idle.
 
-On Cloud Run, scaffold with `--session-type cloud_sql` (or add it later with
-`agents-cli scaffold enhance --session-type cloud_sql`): `infra single-project --apply`
-then creates a Cloud SQL for PostgreSQL instance (billed while it exists) and wires it
-into the service, and transcripts are mirrored to its `claude_session_store` table, so
-conversations survive restarts and move between instances. Deployed without `infra`
-first, the service has no database. Locally, transcripts stay on disk.
+With `SESSION_TYPE=cloud_sql` on Cloud Run, scaffold with `--session-type cloud_sql` (or
+add it later with `agents-cli scaffold enhance --session-type cloud_sql`): `infra
+single-project --apply` then creates a Cloud SQL for PostgreSQL instance (billed while
+it exists) and wires it into the service, and transcripts are mirrored to its
+`claude_session_store` table, so conversations survive restarts and move between
+instances. Deployed without `infra` first, the service has no database. Locally,
+transcripts stay on disk. On Agent Runtime, Cloud SQL needs the manual network and
+connector setup below; `:query` session management (`async_get/list/delete_session`) and
+the Console session view require `agent_platform_sessions`.
 
-An agent can pass its own `session_store` in `root_agent`; it wins over Cloud SQL. If a
+An agent can pass its own `session_store` in `root_agent`; it wins over `SESSION_TYPE`. If a
 write to the store still fails after the SDK's retries, the turn fails, and the store
 keeps the conversation without that turn: later turns, on any instance, resume as if it
 didn't happen, though its tool calls did run. Rows are never deleted: schedule a
 `DELETE ... WHERE mtime < <cutoff ms>` if transcripts must expire.
 
 At most `CLAUDE_MAX_WORKSPACES` (default 100) conversation directories are kept per
-instance; the least recently used beyond that are deleted. Without Cloud SQL an evicted
-conversation starts fresh.
+instance; the least recently used beyond that are deleted. With `in_memory` (and no
+custom `session_store`), an evicted conversation starts fresh; with
+`agent_platform_sessions` or `cloud_sql`, it resumes from the store.
 
 ### Cloud SQL on Agent Runtime (manual setup)
 
 Agent Runtime has no `/cloudsql` socket, so the engine reaches a private-IP instance
-through a PSC interface and the Cloud SQL Python Connector:
+through a PSC interface and the Cloud SQL Python Connector. Note that Agent Runtime
+rejects combining `--network-attachment` with an Agent Gateway (`--agent-gateway-ingress`
+or `--agent-gateway-egress`): if the agent uses Agent Gateway on Agent Runtime, use
+`--session-type agent_platform_sessions` instead.
+
+Scaffold with `--session-type cloud_sql` (so `app/app_utils/settings.py` sets
+`SESSION_TYPE = "cloud_sql"` and Terraform enables `sqladmin`/`secretmanager` and grants
+`roles/cloudsql.client` and `roles/secretmanager.secretAccessor`), then set up:
 
 1. Network: a VPC with a subnet of at least `/28` in the engine's region, and a network
    attachment on it created with `--connection-preference=ACCEPT_MANUAL`
@@ -176,7 +210,7 @@ through a PSC interface and the Cloud SQL Python Connector:
    ```bash
    agents-cli deploy \
      --network-attachment projects/<project>/regions/<region>/networkAttachments/<name> \
-     --env-vars INSTANCE_CONNECTION_NAME=<project>:<region>:<instance>,DB_NAME=<db>,DB_USER=<user>,GOOGLE_API_ENABLE_RUNTIME_BOUND_TOKEN=false \
+     --env-vars SESSION_TYPE=cloud_sql,INSTANCE_CONNECTION_NAME=<project>:<region>:<instance>,DB_NAME=<db>,DB_USER=<user>,GOOGLE_API_ENABLE_RUNTIME_BOUND_TOKEN=false \
      --secrets DB_PASS=<secret>
    ```
 
@@ -237,12 +271,15 @@ the agent called no tool; grade those in a dataset without it.
   check that.") streams but is not part of the reply. With `output_format` set, the
   reply is the structured output as JSON, in one chunk.
 
-On Agent Runtime, `:query` serves `async_create_session` and `:streamQuery` serves
-`async_stream_query` (`app/app_utils/reasoning_engine.py`); other methods return 404. A
+On Agent Runtime, `:query` serves `async_create_session` (and, with
+`SESSION_TYPE=agent_platform_sessions`, `async_get_session`, `async_list_sessions` and
+`async_delete_session`), and `:streamQuery` serves `async_stream_query`
+(`app/app_utils/reasoning_engine.py`); other methods return 404. A
 session id is a conversation id, scoped to the request's `user_id`, which the caller
 chooses: anyone allowed to query the engine can resume a conversation whose id and
-`user_id` they know. A turn without a session id starts a new conversation. A failed turn
-ends with an event carrying `error_code` and `error_message`.
+`user_id` they know. A turn without a session id starts a new session; a turn in an
+unknown session id creates it. Another user's session is not found. A failed turn ends
+with an event carrying `error_code` and `error_message`.
 
 Query a served agent with `--url`:
 

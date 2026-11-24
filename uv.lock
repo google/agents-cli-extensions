@@ -503,7 +503,7 @@ wheels = [
 
 [[package]]
 name = "google-agents-cli"
-version = "1.15.0"
+version = "1.16.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "a2a-sdk" },
@@ -533,14 +533,14 @@ dependencies = [
     { name = "uvicorn" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f0/b1/c8dda2448f2549a350c091437b0d18b76515cbb2c0ada4704f331e9a6188/google_agents_cli-1.15.0.tar.gz", hash = "sha256:f103ff9c0cab79b80c68e92d8da74303dca23c52d20a0ad4f988571e24faf16c", size = 1347149, upload-time = "2026-11-17T15:26:24.684Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f1/19/9cd0ec541c31f38df61fa9a4f81342acb90cb92f3927611108d71f9e97f5/google_agents_cli-1.16.0.tar.gz", hash = "sha256:d3a39951ff80058599dbc21013cf943d56599c74ce9957035ddfad0eddd5bdd6", size = 1467549, upload-time = "2026-11-24T18:33:06.116Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9f/d5/5fc8fd644ae0b90ae61ccd3ce71dc37af4bd13a28b8ac66052ae02857dfd/google_agents_cli-1.15.0-py3-none-any.whl", hash = "sha256:b7b2b463a9a65aebd2436d774855c2ab3b15034a89d285b4c02fd29ba0b4ad93", size = 1668526, upload-time = "2026-11-17T15:26:22.488Z" },
+    { url = "https://files.pythonhosted.org/packages/2d/bb/cd5b3f99dcc61703058085b39b2e4428c54e1ddbcca1945a51e38ceed9fb/google_agents_cli-1.16.0-py3-none-any.whl", hash = "sha256:ac0d4cc9ffd7e66ed7f7b38cd6c4484d06cb1c5bb901c7c5cc550a7dae7de036", size = 1796634, upload-time = "2026-11-24T18:33:04.686Z" },
 ]
 
 [[package]]
 name = "google-agents-cli-extensions"
-version = "1.15.0"
+version = "1.16.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]

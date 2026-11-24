@@ -36,11 +36,15 @@ _REMOTE_FLAGS = ("--url", "--mode")
 
 def main() -> int:
     argv = sys.argv[1:]
-    if any(arg.split("=", 1)[0] in _REMOTE_FLAGS for arg in argv):
+    if _has_flag(argv, _REMOTE_FLAGS):
+        # The built-in `agents-cli run` accepts `--help`, not `-h`.
+        forwarded = ["--help"] if _has_flag(argv, ("-h", "--help")) else argv
         env = {**os.environ, "AGENTS_CLI_DISABLE_OVERRIDES": "1"}
-        return subprocess.run(["agents-cli", "run", *argv], env=env).returncode
+        return subprocess.run(["agents-cli", "run", *forwarded], env=env).returncode
 
-    parser = argparse.ArgumentParser(prog="agents-cli run", description=__doc__)
+    parser = argparse.ArgumentParser(
+        prog="agents-cli run", description=__doc__, allow_abbrev=False
+    )
     parser.add_argument("message", help="The prompt to send to the agent.")
     parser.add_argument(
         "--session-id",
@@ -53,6 +57,22 @@ def main() -> int:
         action="store_true",
         help="Print each tool call (name, arguments and result) as JSON.",
     )
+    remote = parser.add_argument_group(
+        "remote options",
+        "Passing --url or --mode delegates to the built-in `agents-cli run` "
+        "(which also accepts --app-name, -f/--file, and -H/--header).",
+    )
+    remote.add_argument(
+        "--url",
+        default=None,
+        help="URL or Agent Runtime resource name of a deployed agent to query.",
+    )
+    remote.add_argument(
+        "--mode",
+        choices=("a2a", "adk"),
+        default=None,
+        help="Protocol used to talk to the deployed agent ('a2a' or 'adk').",
+    )
     args = parser.parse_args(argv)
 
     import anyio
@@ -61,6 +81,8 @@ def main() -> int:
 
     # .env first: app.agent's tool lists depend on flags such as MEMORY_BANK_ENABLED.
     load_dotenv()
+    # Local in-process runs keep transcripts on disk instead of creating remote sessions.
+    os.environ.setdefault("SESSION_TYPE", "in_memory")
     from app.agent import root_agent
     from app.app_utils.claude import AgentError, run_turn
 
@@ -79,6 +101,11 @@ def main() -> int:
         f'  Resume with: agents-cli run "<message>" --session-id {conversation_id}'
     )
     return 0
+
+
+def _has_flag(argv: list[str], flags: tuple[str, ...]) -> bool:
+    options = argv[: argv.index("--")] if "--" in argv else argv
+    return any(arg.split("=", 1)[0] in flags for arg in options)
 
 
 if __name__ == "__main__":

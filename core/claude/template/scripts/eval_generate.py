@@ -302,6 +302,8 @@ def main() -> int:
 
     # .env first: app.agent's tool lists depend on flags such as MEMORY_BANK_ENABLED.
     load_dotenv()
+    # Local eval runs stay self-contained instead of creating remote sessions.
+    os.environ.setdefault("SESSION_TYPE", "in_memory")
     from app.agent import root_agent
     from app.app_utils.claude import run_turn
     from app.app_utils.settings import AGENT_NAME

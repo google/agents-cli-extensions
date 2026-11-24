@@ -1,5 +1,18 @@
 # Release notes
 
+## [1.16.0] - 2026-11-24
+
+- Claude: Add `agent_platform_sessions` as a `--session-type` option alongside
+  `cloud_sql` and `in_memory` (rendered to `SESSION_TYPE` in
+  `app/app_utils/settings.py` and overridable via the `SESSION_TYPE`
+  environment variable). With `agent_platform_sessions`, conversations survive
+  instance restarts and redeploys, `:query` serves `async_create_session`,
+  `async_get_session`, `async_list_sessions` and `async_delete_session`, and
+  the Google Cloud console playground and Sessions view work on Agent Runtime.
+- Claude: List both local (`--session-id`, `-v`/`--verbose`) and remote
+  (`--url`, `--mode`) flags in `agents-cli run --help` and `agents-cli run -h`
+  instead of showing only the generic extension wrapper description.
+
 ## [1.15.0] - 2026-11-18
 
 - LangChain: Pass `--session-type cloud_sql` to `agents-cli create` or

@@ -18,6 +18,10 @@
 # create_params.root_agent_name in agents-cli-manifest.yaml.
 AGENT_NAME: str = "{{cookiecutter.root_agent_name}}"
 
+# Session backend chosen at scaffold time (in_memory, cloud_sql, or
+# agent_platform_sessions); SESSION_TYPE in the environment overrides it.
+SESSION_TYPE: str = "{{cookiecutter.session_type}}"
+
 # The agents-cli version that created this project. Model calls send it in the
 # x-goog-api-client header so Google can count traffic from agents-cli projects;
 # set DO_NOT_TRACK=1 or AGENTS_CLI_TELEMETRY=0 to stop sending it.

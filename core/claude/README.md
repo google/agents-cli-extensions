@@ -30,6 +30,6 @@ agents-cli run "What's the weather in San Francisco?"
 
 The model named in `app/agent.py` must be enabled in Model Garden for your project, and `run` and `eval` need `GOOGLE_CLOUD_PROJECT` with Application Default Credentials.
 
-Pass `--memory-bank` to `create` (Agents CLI 1.14.0 or later) to give the agent long-term memory of each user in Memory Bank.
+Pass `--session-type agent_platform_sessions` or `--session-type cloud_sql` to `create` to persist conversations across instances and restarts, and `--memory-bank` (Agents CLI 1.14.0 or later) to give the agent long-term memory of each user in Memory Bank.
 
 The project's coding-agent guide (`AGENTS.md`) and skill (`.agents/skills/agents-cli-claude/`) cover the agent's configuration, sessions, and migrating an existing Claude agent.

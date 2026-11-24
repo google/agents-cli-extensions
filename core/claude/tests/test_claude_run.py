@@ -165,3 +165,64 @@ class TestRun:
         assert command == ["agents-cli", "run", *argv]
         assert kwargs["env"]["AGENTS_CLI_DISABLE_OVERRIDES"] == "1"
         assert seen == []
+
+    def test_short_help_lists_local_and_remote_options(self, mod, monkeypatch, capsys):
+        with pytest.raises(SystemExit) as exit_info:
+            _run(mod, ["-h"], monkeypatch)
+
+        assert exit_info.value.code == 0
+        out = capsys.readouterr().out
+        for entry in (
+            "--session-id SESSION_ID",
+            "--verbose",
+            "--url URL",
+            "--mode {a2a,adk}",
+            "--app-name",
+        ):
+            assert entry in out
+
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            ["--url", "-h"],
+            ["--mode=a2a", "-h"],
+        ],
+    )
+    @patch("subprocess.run")
+    def test_remote_short_help_delegates_as_long_help(
+        self, mock_run, mod, seen, argv, monkeypatch
+    ):
+        """The built-in `agents-cli run` accepts `--help`, not `-h`."""
+        mock_run.return_value = MagicMock(returncode=0)
+
+        assert _run(mod, argv, monkeypatch) == 0
+
+        command, kwargs = mock_run.call_args.args[0], mock_run.call_args.kwargs
+        assert command == ["agents-cli", "run", "--help"]
+        assert kwargs["env"]["AGENTS_CLI_DISABLE_OVERRIDES"] == "1"
+        assert seen == []
+
+    @patch("subprocess.run")
+    def test_double_dash_treats_remote_flag_literal_as_local_message(
+        self, mock_run, mod, seen, monkeypatch
+    ):
+        assert _run(mod, ["--", "--url"], monkeypatch) == 0
+
+        mock_run.assert_not_called()
+        assert seen == ["--url"]
+
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            ["--ur", "https://agent.example", "hi"],
+            ["--mo", "a2a", "hi"],
+        ],
+    )
+    def test_abbreviated_remote_flags_are_rejected_not_run_locally(
+        self, mod, seen, argv, monkeypatch
+    ):
+        with pytest.raises(SystemExit) as exit_info:
+            _run(mod, argv, monkeypatch)
+
+        assert exit_info.value.code == 2
+        assert seen == []

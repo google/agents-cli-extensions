@@ -19,9 +19,10 @@ example_question: "What's the weather in San Francisco?"
 render_files: ["Dockerfile", ".env", "app/app_utils/settings.py"]
 settings:
   language: "python"
-  # agent_platform_sessions is ADK-only; the first entry is the default.
+  # The first entry is the default for each target.
   requires_session: true
-  session_types: ["in_memory", "cloud_sql"]
+  session_types: ["in_memory", "cloud_sql", "agent_platform_sessions"]
+  agent_runtime_session_types: ["agent_platform_sessions", "cloud_sql", "in_memory"]
   deployment_targets: ["agent_runtime", "cloud_run", "none"]
   agent_directory: "app"
   extra_dependencies: []

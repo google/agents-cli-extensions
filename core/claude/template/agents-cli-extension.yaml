@@ -25,7 +25,9 @@ commands:
   override:
     run:
       run: ["uv", "run", "python", "scripts/run.py"]
-      description: Run the agent with a single prompt, in process.
+      description: >-
+        Run the agent locally (`MESSAGE [--session-id ID] [-v]`) or query a
+        deployed agent (`--url URL --mode a2a|adk`; pass `-h` for full flag help).
 
     # Old command name, so older CLIs apply it too; newer ones map it to `publish gemini`.
     publish.gemini-enterprise:

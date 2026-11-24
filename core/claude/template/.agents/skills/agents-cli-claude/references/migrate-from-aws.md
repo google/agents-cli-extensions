@@ -101,7 +101,7 @@ Add these to the Assess table:
 | AgentCore `@app.entrypoint` or Lambda `handler(event, context)` | Lift the options builder into `root_agent`. Anything built from the payload or context per request, memory reads before a turn and memory writes after it, is code between turns: not supported as-is. Tell the user |
 | Own FastAPI or Flask server calling `query()` | Lift the options. A2A replaces the routes, so callers change (see Callers) |
 | Agent code in a subdirectory with flat imports | Make it importable from `app/agent.py` (add the directory to `sys.path` there) instead of moving files |
-| `session_store=` on S3, Redis or DynamoDB | Recommend `--session-type cloud_sql` instead (Cloud Run; on Agent Runtime it needs manual setup, see `migrate-claude-agent.md` step 3). Keeping it needs AWS credentials and adds cross-cloud latency to every turn. Existing conversations don't carry over either way |
+| `session_store=` on S3, Redis or DynamoDB | Recommend `--session-type agent_platform_sessions` (default on `agent_runtime`, also available on `cloud_run`; no database setup) or `--session-type cloud_sql` (Terraform-provisioned on `cloud_run`; manual VPC/connector setup on `agent_runtime`, see `migrate-claude-agent.md` step 3). Keeping the AWS store needs AWS credentials and adds cross-cloud latency to every turn. Existing conversations don't carry over either way |
 | AgentCore Memory | No equivalent. Tell the user |
 | Tools calling AWS (`boto3`) | They need AWS credentials on GCP: keys in Secret Manager, or an AWS IAM role that trusts Google's identity token. Tell the user; adds egress cost and latency |
 | Secrets read from Secrets Manager or SSM | Move them to Secret Manager and read an env var (`deploy --secrets`) |

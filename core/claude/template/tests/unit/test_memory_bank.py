@@ -71,11 +71,9 @@ _PAST = (
 
 
 @pytest.fixture
-def memory_on(isolated, monkeypatch):
+def memory_on(isolated, sessions_api, monkeypatch):
     """Memory on, in an Agent Runtime deployment."""
     monkeypatch.setenv("MEMORY_BANK_ENABLED", "true")
-    monkeypatch.setenv("GOOGLE_CLOUD_AGENT_ENGINE_ID", "123")
-    monkeypatch.setenv("GOOGLE_CLOUD_AGENT_ENGINE_LOCATION", "us-central1")
 
 
 def _fake_client(client_class: MagicMock, memories=()) -> MagicMock:
